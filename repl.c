@@ -8,6 +8,23 @@ typedef struct {
     ssize_t input_len;
 } InputBuffer;
 
+typedef enum { STATEMENT_INSERT, STATEMENT_SELECT } StatementType;
+
+typedef struct {
+  StatementType type;
+} Statement;
+
+typedef enum {
+  META_COMMAND_SUCCESS,
+  META_COMMAND_UNRECOGNIZED_COMMAND
+} MetaCommandResult;
+
+typedef enum {
+    PREPARE_SUCCESS,
+    PREPARE_UNRECOGNIZED_STATEMENT
+} PrepareResult;
+
+
 InputBuffer* create_input_buffer() {
     InputBuffer* in_buf = (InputBuffer*) malloc(sizeof(InputBuffer));
     in_buf -> buffer = NULL;
@@ -38,6 +55,38 @@ void read_input(InputBuffer* in_buf) {
     in_buf -> buffer[bytes_read - 1] = '\0';
 }
 
+MetaCommandResult do_meta_command(InputBuffer* input_buffer) {
+    if (strcmp(input_buffer->buffer, ".exit") == 0) {
+        exit(EXIT_SUCCESS);
+    } else {
+        return META_COMMAND_UNRECOGNIZED_COMMAND;
+    }
+}
+
+PrepareResult prepare_statement(InputBuffer* input_buffer, Statement* statement) {
+    if (strncmp(input_buffer->buffer, "insert", 6) == 0) {
+        statement->type = STATEMENT_INSERT;
+        return PREPARE_SUCCESS;
+    }
+    if (strcmp(input_buffer->buffer, "select") == 0) {
+        statement->type = STATEMENT_SELECT;
+        return PREPARE_SUCCESS;
+    }
+
+    return PREPARE_UNRECOGNIZED_STATEMENT;
+}
+
+void execute_statement(Statement* statement) {
+    if ((*statement).type == STATEMENT_INSERT) {
+        // insert
+        puts("insert");
+    }
+    if ((*statement).type == STATEMENT_SELECT) {
+        // select
+        puts("select");
+    }
+}
+
 int main(int argc, char** argv) {
     InputBuffer* in_buf = create_input_buffer();
 
@@ -45,11 +94,24 @@ int main(int argc, char** argv) {
         print_prompt();
         read_input(in_buf);
 
-        if (strcmp(in_buf->buffer, ".exit") == 0) {
-            destroy_input_buffer(in_buf);
-            exit(EXIT_SUCCESS);
-        } else {
-            printf("Unrecognized command: %s\n", in_buf -> buffer);
+        // meta command
+        if ((in_buf -> buffer)[0] == '.') {
+            MetaCommandResult mr = do_meta_command(in_buf);
+            if (mr == META_COMMAND_SUCCESS) {
+                continue;
+            } else if (mr == META_COMMAND_UNRECOGNIZED_COMMAND) {
+                printf("Unrecognized command '%s'\n", in_buf->buffer);
+                continue;
+            }
         }
+
+        Statement statement;
+        PrepareResult pr = prepare_statement(in_buf, &statement);
+        if (pr == PREPARE_UNRECOGNIZED_STATEMENT) {
+            printf("Unrecognized keyword at start of '%s'.\n", in_buf->buffer);
+            continue;
+        }
+
+        execute_statement(&statement);
     }
 }
